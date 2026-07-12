@@ -114,3 +114,106 @@ if __name__ == "__main__":
         print(f"リターン    : {r['multiple']:.2f}倍 (年率 {r['cagr']*100:+.1f}%)")
         print(f"最大DD      : {r['max_drawdown']*100:.1f}% ({r['dd_peak']}→{r['dd_trough']})")
         print(f"データ点数  : {len(r['series_values'])}日分")
+
+# ============================================================
+# モードB: 積立(金額指定 / 株数指定) SPEC v2準拠
+# 買い付けリスト方式: 一括もハイブリッドも同じ仕組みで扱える土台
+# ============================================================
+
+def _monthly_buy_dates(px_dates, start, end, buy_day):
+    """開始〜終了の各月について、指定日(休場日なら直後の営業日)の実営業日リストを返す。"""
+    dates = pd.to_datetime(pd.Series(px_dates))
+    dates = dates[(dates >= pd.to_datetime(start)) & (dates <= pd.to_datetime(end))]
+    if len(dates) == 0:
+        return []
+    result = []
+    cur = pd.to_datetime(start).replace(day=1)
+    last = pd.to_datetime(end).replace(day=1)
+    while cur <= last:
+        try:
+            target = cur.replace(day=buy_day)
+        except ValueError:
+            target = cur + pd.offsets.MonthEnd(0)
+        after = dates[dates >= target]
+        if len(after) > 0:
+            d = after.min()
+            if d.month == target.month and d.year == target.year:
+                result.append(d.strftime("%Y-%m-%d"))
+        cur = cur + pd.offsets.MonthBegin(1)
+    return result
+
+
+def simulate_accumulation(code, start, end, mode, amount_or_shares, buy_day):
+    """
+    単一銘柄の積立シミュレーション。
+    mode: "amount"(金額指定) / "shares"(株数指定)
+    amount_or_shares: 金額指定なら毎月の円、株数指定なら毎月の株数
+    """
+    px = get_prices(code)
+    if px.empty:
+        return None
+    px = px[(px["date"] >= start) & (px["date"] <= end)].copy().reset_index(drop=True)
+    if px.empty:
+        return None
+
+    buy_dates = _monthly_buy_dates(px["date"], start, end, buy_day)
+    if not buy_dates:
+        return None
+
+    # 各買い付けを記録
+    buys = []
+    for d in buy_dates:
+        row = px[px["date"] == d]
+        if row.empty:
+            continue
+        close = float(row["close"].iloc[0])
+        adj = float(row["adj_close"].iloc[0])
+        if mode == "amount":
+            shares = amount_or_shares / close   # 金額 ÷ 株価 = 小数株
+            paid = float(amount_or_shares)      # 支払いは固定
+        else:
+            shares = float(amount_or_shares)    # 指定株数
+            paid = amount_or_shares * close     # 支払いは変動
+        buys.append({"date": d, "shares": shares, "paid": paid, "adj_at_buy": adj})
+
+    if not buys:
+        return None
+
+    # 日次評価額: 各買い付け分を「株数 × (今のadj / 買った時のadj)」で成長させ合算
+    values = []
+    invested = []  # その日までの累計投資額(階段状)
+    for _, prow in px.iterrows():
+        t = prow["date"]
+        adj_t = float(prow["adj_close"])
+        v = 0.0
+        inv = 0.0
+        for b in buys:
+            if b["date"] <= t:
+                v += b["paid"] * (adj_t / b["adj_at_buy"])
+                inv += b["paid"]
+        values.append(v)
+        invested.append(inv)
+
+    return {
+        "buys": buys,
+        "dates": list(px["date"].values),
+        "values": values,        # 日次の保有評価額
+        "invested": invested,    # 日次の累計投資額(階段状ライン用)
+    }
+
+
+if __name__ == "__main__":
+    print("=== 積立テスト: 1306 毎月25日 1万円 金額指定 ===")
+    r = simulate_accumulation("1306", "2015-01-01", "2026-07-07", "amount", 10000, 25)
+    if r is None:
+        print("NG: データが取得できませんでした")
+    else:
+        total_paid = sum(b["paid"] for b in r["buys"])
+        total_shares = sum(b["shares"] for b in r["buys"])
+        final_value = r["values"][-1]
+        print(f"買付回数    : {len(r['buys'])}回")
+        print(f"累計投資額  : {total_paid:,.0f}円")
+        print(f"累計取得株数: {total_shares:,.2f}株")
+        print(f"平均取得単価: {total_paid/total_shares:,.1f}円")
+        print(f"最終評価額  : {final_value:,.0f}円")
+        print(f"リターン    : {final_value/total_paid:.2f}倍")
