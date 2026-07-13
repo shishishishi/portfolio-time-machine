@@ -1,4 +1,4 @@
-﻿# core/data.py (分割補正つき完成版)
+# core/data.py (分割補正つき完成版)
 from pathlib import Path
 import sqlite3
 import numpy as np

@@ -22,6 +22,8 @@ st.set_page_config(page_title="ポートフォリオ・タイムマシン", layo
 
 BLUE = "#4169E1"
 PINK = "#E73895"
+DATE_MIN = pd.to_datetime("2001-01-01")   # 日付選択の下限(yfinance日本株の実質下限)
+DATE_MAX = pd.to_datetime("today")        # 日付選択の上限(今日)
 COLORS = [BLUE, "#2E4FB8", PINK, "#B8527A", "#5B8DEF", "#1D9E75",
           "#D85A30", "#7F77DD", "#BA7517", "#639922"]
 
@@ -85,8 +87,8 @@ if mode == "一括投資":
     with left:
         st.subheader("STEP 1  期間")
         c1, c2 = st.columns(2)
-        start = c1.date_input("開始日", value=pd.to_datetime("2015-01-05")).strftime("%Y-%m-%d")
-        end = c2.date_input("終了日", value=pd.to_datetime("2026-07-07")).strftime("%Y-%m-%d")
+        start = c1.date_input("開始日", value=pd.to_datetime("2015-01-05"), min_value=DATE_MIN, max_value=DATE_MAX).strftime("%Y-%m-%d")
+        end = c2.date_input("終了日", value=pd.to_datetime("2026-07-07"), min_value=DATE_MIN, max_value=DATE_MAX).strftime("%Y-%m-%d")
         st.subheader("STEP 2  銘柄と株数")
         n = st.number_input("銘柄数", min_value=1, max_value=10, value=1, step=1)
         holdings = {}
@@ -154,8 +156,8 @@ elif mode == "積立投資":
     with left:
         st.subheader("STEP 1  期間")
         c1, c2 = st.columns(2)
-        start = c1.date_input("開始日", value=pd.to_datetime("2015-01-01")).strftime("%Y-%m-%d")
-        end = c2.date_input("終了日", value=pd.to_datetime("2026-07-07")).strftime("%Y-%m-%d")
+        start = c1.date_input("開始日", value=pd.to_datetime("2015-01-01"), min_value=DATE_MIN, max_value=DATE_MAX).strftime("%Y-%m-%d")
+        end = c2.date_input("終了日", value=pd.to_datetime("2026-07-07"), min_value=DATE_MIN, max_value=DATE_MAX).strftime("%Y-%m-%d")
         st.subheader("STEP 2  積立の設定")
         acc_style = st.radio("積立方式", ["金額指定(定額)", "株数指定(定量)"])
         if acc_style.startswith("金額"):
@@ -219,8 +221,8 @@ else:  # ============================ ハイブリッド(積立枠 + 成長枠) 
     with left:
         st.subheader("STEP 1  期間")
         c1, c2 = st.columns(2)
-        start = c1.date_input("開始日", value=pd.to_datetime("2015-01-01")).strftime("%Y-%m-%d")
-        end = c2.date_input("終了日", value=pd.to_datetime("2026-07-07")).strftime("%Y-%m-%d")
+        start = c1.date_input("開始日", value=pd.to_datetime("2015-01-01"), min_value=DATE_MIN, max_value=DATE_MAX).strftime("%Y-%m-%d")
+        end = c2.date_input("終了日", value=pd.to_datetime("2026-07-07"), min_value=DATE_MIN, max_value=DATE_MAX).strftime("%Y-%m-%d")
 
         st.subheader("STEP 2  積立枠(毎月コツコツ)")
         acc_style = st.radio("積立方式", ["金額指定(定額)", "株数指定(定量)"], key="hy_style")
@@ -235,7 +237,6 @@ else:  # ============================ ハイブリッド(積立枠 + 成長枠) 
 
         st.subheader("STEP 3  成長枠(任意日にスポット)")
         st.caption("個別株を、好きな日付・銘柄で。件数を選び各スポットを入力(未入力の行は無視)。")
-        st.caption("※株数は現在(株式分割調整後)ベースです。購入後に分割した銘柄は当時の実株数と異なる場合があります(金額指定なら影響なし)。")
         n_spot_in = st.number_input("スポット件数", min_value=0, max_value=10, value=1, step=1, key="hy_nspot")
         spot_rows = []
         for i in range(int(n_spot_in)):

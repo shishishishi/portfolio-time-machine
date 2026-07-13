@@ -1,4 +1,4 @@
-﻿# core/calc.py
+# core/calc.py
 # 「銘柄+株数+期間」から評価額の推移と4指標を計算する頭脳
 
 import pandas as pd
