@@ -24,6 +24,16 @@ BLUE = "#4169E1"
 PINK = "#E73895"
 DATE_MIN = pd.to_datetime("2001-01-01")   # 日付選択の下限(yfinance日本株の実質下限)
 DATE_MAX = pd.to_datetime("today")        # 日付選択の上限(今日)
+
+# 推移チャートの操作設定(スマホ誤操作対策・PCと共通)
+# 1本指ドラッグ/スクロールではズームさせず縦スクロール優先、ピンチでズーム、
+# ダブルタップで初期表示に戻す。描画内容(元本ライン・縦線等)には一切影響しない。
+CHART_CONFIG = {
+    "scrollZoom": False,
+    "doubleClick": "reset",
+    "displayModeBar": False,
+    "displaylogo": False,
+}
 COLORS = [BLUE, "#2E4FB8", PINK, "#B8527A", "#5B8DEF", "#1D9E75",
           "#D85A30", "#7F77DD", "#BA7517", "#639922"]
 
@@ -156,10 +166,12 @@ if mode == "一括投資":
                             fill="tozeroy", fillcolor="rgba(65,105,225,0.08)", name="評価額"))
                         line.add_hline(y=r["principal_total"], line_dash="dot", line_color=PINK,
                                        annotation_text=f"元本 ¥{r['principal_total']:,.0f}")
-                        line.update_layout(title="評価額の推移(配当込み)",
+                        line.update_layout(title="評価額の推移(配当込み)", dragmode=False,
                                            margin=dict(t=40, b=0, l=0, r=0), height=380,
                                            yaxis_title=None)
-                        st.plotly_chart(line, use_container_width=True)
+                        st.plotly_chart(line, use_container_width=True, config=CHART_CONFIG, key="chart_lump")
+                        if st.button("表示をリセット", key="reset_lump"):
+                            st.rerun()
                     st.caption(f"最大下落は {r['dd_peak']} の高値から {r['dd_trough']} まで。手数料・税・単元制約・為替は未考慮。")
 
 elif mode == "積立投資":
@@ -217,11 +229,13 @@ elif mode == "積立投資":
                     fig.add_trace(go.Scatter(
                         x=pd.to_datetime(r["dates"]), y=r["invested"],
                         mode="lines", line=dict(color=PINK, width=2, dash="dot"), name="累計投資額(元本)"))
-                    fig.update_layout(title="評価額と累計投資額の推移",
+                    fig.update_layout(title="評価額と累計投資額の推移", dragmode=False,
                                       margin=dict(t=40, b=0, l=0, r=0), height=420,
                                       yaxis_title=None,
                                       legend=dict(orientation="h", y=1.08, x=0.5, xanchor="center"))
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, use_container_width=True, config=CHART_CONFIG, key="chart_acc")
+                    if st.button("表示をリセット", key="reset_acc"):
+                        st.rerun()
                     if acc_mode == "shares":
                         st.caption(f"株数指定のため月々の支払額は変動します。初回 ¥{r['buys'][0]['paid']:,.0f} → 直近 ¥{r['buys'][-1]['paid']:,.0f}。手数料・税・為替は未考慮。")
                     else:
@@ -338,11 +352,13 @@ else:  # ============================ ハイブリッド(積立枠 + 成長枠) 
                     for sd in sorted({b["date"] for b in r["buys"] if b["code"] != dca_code}):
                         fig.add_vline(x=pd.to_datetime(sd), line_width=1, line_dash="dot",
                                       line_color="rgba(231,56,149,0.35)")
-                    fig.update_layout(title="評価額と累計投資額の推移(成長枠の注入日=縦線)",
+                    fig.update_layout(title="評価額と累計投資額の推移(成長枠の注入日=縦線)", dragmode=False,
                                       margin=dict(t=40, b=0, l=0, r=0), height=420,
                                       yaxis_title=None,
                                       legend=dict(orientation="h", y=1.08, x=0.5, xanchor="center"))
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, use_container_width=True, config=CHART_CONFIG, key="chart_hybrid")
+                    if st.button("表示をリセット", key="reset_hybrid"):
+                        st.rerun()
 
                     # 平均取得単価は銘柄ごと(株数は銘柄横断で足せないため)
                     st.markdown("**銘柄別の取得状況**(平均取得単価は銘柄ごと)")
