@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from core.calc import simulate, check_listing, simulate_accumulation, simulate_hybrid
-from core.data import get_split_info
+from core.data import get_split_info, get_cumulative_split_factor
 
 
 def show_split_notice(codes):
@@ -123,6 +123,16 @@ if mode == "一括投資":
                     m2.metric("最終評価額", f"¥{r['final_value']:,.0f}")
                     m3.metric("リターン", f"{r['multiple']:.2f}倍", f"年率 {r['cagr']*100:+.1f}%")
                     m4.metric("最大DD", f"{r['max_drawdown']*100:.1f}%")
+                    # 当時換算: 購入日以降の分割倍率を掛け戻した実額(分割が無ければ表示しない)
+                    then_total = 0.0
+                    has_split = False
+                    for c, pr in r["principals"].items():
+                        f = get_cumulative_split_factor(c, start)
+                        then_total += pr * f
+                        if f > 1.0:
+                            has_split = True
+                    if has_split:
+                        st.caption(f"元本 ¥{r['principal_total']:,.0f} は現在の株数換算。購入当時の株価では **約 ¥{then_total:,.0f}** に相当します(その後の株式分割 分を掛け戻し)。")
                     codes = list(r["principals"].keys())
                     if len(codes) >= 2:
                         g1, g2 = st.columns([1, 2])
@@ -339,12 +349,20 @@ else:  # ============================ ハイブリッド(積立枠 + 成長枠) 
                     rows = []
                     for c, v in r["cost"].items():
                         枠 = "積立" if c == dca_code else "成長"
-                        rows.append({
+                        row = {
                             "枠": 枠,
                             "銘柄": f"{c} {name_of(c)}",
                             "投資額": f"¥{v['paid']:,.0f}",
                             "取得株数": f"{v['shares']:,.2f}",
                             "平均取得単価": f"¥{v['avg_cost']:,.1f}",
-                        })
+                        }
+                        # 成長枠(スポット)のみ当時換算: 各スポットの支払額×購入日以降の分割倍率
+                        if 枠 == "成長":
+                            then_amt = sum(b["paid"] * get_cumulative_split_factor(c, b["date"])
+                                           for b in r["buys"] if b["code"] == c)
+                            row["当時換算"] = f"約¥{then_amt:,.0f}" if then_amt > v["paid"] + 0.5 else "—"
+                        else:
+                            row["当時換算"] = "—"
+                        rows.append(row)
                     st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
                     st.caption("積立枠はドルコスト平均で取得単価が平準化、成長枠は指定日一括の単価。手数料・税・単元制約・為替は未考慮。")

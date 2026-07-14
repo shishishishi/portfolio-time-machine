@@ -176,3 +176,22 @@ _SPLIT_INFO_CACHE = {}
 def get_split_info(code: str):
     """直近のget_pricesで、その銘柄にどんな分割補正を適用したかを返す。"""
     return _SPLIT_INFO_CACHE.get(code, [])
+_SPLITS_SERIES_CACHE = {}
+
+def get_cumulative_split_factor(code: str, buy_date: str) -> float:
+    """buy_date(YYYY-MM-DD)以降に起きた株式分割の累積倍率を返す。
+    当時の実額 = 調整後の金額 × この倍率。失敗時は 1.0(安全側)。"""
+    try:
+        if code not in _SPLITS_SERIES_CACHE:
+            import yfinance as yf
+            _SPLITS_SERIES_CACHE[code] = yf.Ticker(f"{code}.T").splits
+        s = _SPLITS_SERIES_CACHE[code]
+        if s is None or len(s) == 0:
+            return 1.0
+        s_after = s[s.index.strftime("%Y-%m-%d") > buy_date]
+        if len(s_after) == 0:
+            return 1.0
+        f = float(s_after.prod())
+        return f if f > 0 else 1.0
+    except Exception:
+        return 1.0  # 取得失敗時は換算なし(現在換算のみ表示)
