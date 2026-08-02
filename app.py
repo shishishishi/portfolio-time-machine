@@ -1,12 +1,12 @@
 # app.py
 # ポートフォリオ・タイムマシン (一括 / 積立 / ハイブリッド モード対応)
+from pathlib import Path
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
 from core.calc import simulate, check_listing, simulate_accumulation, simulate_hybrid
 from core.data import get_split_info, get_cumulative_split_factor
-
 
 def show_split_notice(codes):
     """補正があった銘柄について、画面に明示する"""
@@ -58,7 +58,7 @@ h1 { color: #4169E1 !important; }
 
 @st.cache_data
 def load_master():
-    return pd.read_csv("data/master.csv", dtype=str)
+    return pd.read_csv(Path(__file__).resolve().parent / "data" / "master.csv", dtype=str)
 
 
 master = load_master()
